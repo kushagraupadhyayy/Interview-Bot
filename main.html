@@ -1,0 +1,460 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Interview Coach</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        .chat-bubble {
+            max-width: 80%;
+            word-wrap: break-word;
+        }
+        .chat-bubble-user {
+            background-color: #3b82f6; /* blue-500 */
+        }
+        .chat-bubble-bot {
+            background-color: #e5e7eb; /* gray-200 */
+            color: #1f2937; /* gray-800 */
+        }
+        #chat-container::-webkit-scrollbar {
+            width: 6px;
+        }
+        #chat-container::-webkit-scrollbar-track {
+            background: #f1f5f9; /* slate-100 */
+        }
+        #chat-container::-webkit-scrollbar-thumb {
+            background: #cbd5e1; /* slate-300 */
+            border-radius: 3px;
+        }
+        .loader {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #3b82f6;
+            border-radius: 50%;
+            width: 24px;
+            height: 24px;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body class="bg-slate-100 text-slate-800 flex flex-col items-center justify-center min-h-screen p-4">
+
+    <div id="setup-screen" class="w-full max-w-lg bg-white p-8 rounded-2xl shadow-lg transition-all duration-500">
+        <div class="text-center mb-8">
+            <h1 class="text-3xl font-bold text-slate-900">AI Interview Coach</h1>
+            <p class="text-slate-500 mt-2">Get ready to ace your next interview. Let's get you set up!</p>
+        </div>
+
+        <div class="space-y-6">
+            <div>
+                <label for="job-role" class="block text-sm font-medium text-slate-700 mb-2">Select Target Job Role:</label>
+                <select id="job-role" class="w-full p-3 bg-slate-50 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                    <option value="Software Engineer">Software Engineer</option>
+                    <option value="Product Manager">Product Manager</option>
+                    <option value="Data Analyst">Data Analyst</option>
+                    <option value="UX/UI Designer">UX/UI Designer</option>
+                </select>
+            </div>
+            <div>
+                <label for="domain" class="block text-sm font-medium text-slate-700 mb-2">Specify Domain (Optional):</label>
+                <input type="text" id="domain" placeholder="e.g., Frontend, Backend, ML" class="w-full p-3 bg-slate-50 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-slate-700 mb-2">Select Interview Mode:</label>
+                <div class="grid grid-cols-2 gap-4">
+                    <button onclick="selectInterviewMode('Technical')" class="interview-mode-btn p-4 border border-slate-300 rounded-lg text-center hover:bg-blue-50 hover:border-blue-500 focus:ring-2 focus:ring-blue-500 focus:outline-none">Technical</button>
+                    <button onclick="selectInterviewMode('Behavioral')" class="interview-mode-btn p-4 border border-slate-300 rounded-lg text-center hover:bg-blue-50 hover:border-blue-500 focus:ring-2 focus:ring-blue-500 focus:outline-none">Behavioral</button>
+                </div>
+                <input type="hidden" id="interview-mode" value="">
+            </div>
+        </div>
+
+        <button id="start-interview-btn" class="w-full bg-blue-600 text-white font-bold py-3 px-4 rounded-lg mt-8 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:bg-slate-400" disabled>
+            Start Interview
+        </button>
+    </div>
+
+    <div id="interview-screen" class="w-full max-w-3xl h-[85vh] bg-white rounded-2xl shadow-lg flex-col hidden transition-all duration-500">
+        <div class="p-4 border-b border-slate-200 flex justify-between items-center">
+             <div>
+                <h2 class="text-xl font-bold text-slate-900">Interview Session</h2>
+                <p id="interview-details" class="text-sm text-slate-500"></p>
+            </div>
+            <button onclick="endInterview(true)" class="bg-red-500 text-white font-semibold py-2 px-4 rounded-lg hover:bg-red-600 text-sm">End & Get Report</button>
+        </div>
+
+        <div id="chat-container" class="flex-1 p-6 overflow-y-auto">
+            <!-- Chat messages will be appended here -->
+        </div>
+
+        <div class="p-4 border-t border-slate-200">
+            <div id="action-buttons" class="flex justify-center gap-4 mb-2">
+                 <button onclick="requestRetry()" class="bg-yellow-500 text-white font-semibold py-2 px-4 rounded-lg hover:bg-yellow-600 text-sm">Retry Question</button>
+                 <button onclick="requestSkip()" class="bg-slate-500 text-white font-semibold py-2 px-4 rounded-lg hover:bg-slate-600 text-sm">Skip Question</button>
+            </div>
+            <div class="flex items-center space-x-4">
+                <input type="text" id="user-input" placeholder="Type your answer here..." class="flex-1 w-full p-3 bg-slate-100 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:bg-slate-200" disabled>
+                <button id="send-btn" onclick="sendMessage()" class="bg-blue-600 text-white font-bold py-3 px-4 rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:bg-slate-400" disabled>
+                    Send
+                </button>
+            </div>
+        </div>
+    </div>
+    
+    <div id="summary-screen" class="w-full max-w-2xl bg-white p-8 rounded-2xl shadow-lg hidden transition-all duration-500">
+        <h2 class="text-2xl font-bold text-center text-slate-900 mb-6">Interview Summary Report</h2>
+        <div id="summary-content" class="prose max-w-none text-slate-600">
+             <!-- Summary will be injected here -->
+        </div>
+        <div class="mt-8 flex justify-center gap-4">
+            <button onclick="restartInterview()" class="bg-blue-600 text-white font-bold py-2 px-6 rounded-lg hover:bg-blue-700">Start New Interview</button>
+            <button onclick="window.print()" class="bg-slate-600 text-white font-bold py-2 px-6 rounded-lg hover:bg-slate-700">Print Summary</button>
+        </div>
+    </div>
+
+
+    <script>
+        // --- DOM Elements ---
+        const setupScreen = document.getElementById('setup-screen');
+        const interviewScreen = document.getElementById('interview-screen');
+        const summaryScreen = document.getElementById('summary-screen');
+        const startBtn = document.getElementById('start-interview-btn');
+        const jobRoleSelect = document.getElementById('job-role');
+        const domainInput = document.getElementById('domain');
+        const interviewModeInput = document.getElementById('interview-mode');
+        const modeButtons = document.querySelectorAll('.interview-mode-btn');
+        const chatContainer = document.getElementById('chat-container');
+        const userInput = document.getElementById('user-input');
+        const sendBtn = document.getElementById('send-btn');
+        const interviewDetails = document.getElementById('interview-details');
+        const summaryContent = document.getElementById('summary-content');
+        const actionButtons = document.getElementById('action-buttons');
+        
+
+        // --- State Management ---
+        let interviewState = {
+            role: '',
+            domain: '',
+            mode: '',
+            conversation: [],
+            questionCount: 0,
+            maxQuestions: 4, // 3-5 questions
+            isAwaitingAnswer: false
+        };
+
+        // --- Gemini API Configuration ---
+        const API_KEY = ""; // Leave empty, will be handled by the environment
+        const API_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key=${API_KEY}`;
+        
+        // --- Event Listeners ---
+        modeButtons.forEach(button => {
+            button.addEventListener('click', () => {
+                modeButtons.forEach(btn => btn.classList.remove('bg-blue-500', 'text-white'));
+                button.classList.add('bg-blue-500', 'text-white');
+                interviewModeInput.value = button.textContent;
+                validateSetup();
+            });
+        });
+
+        jobRoleSelect.addEventListener('change', validateSetup);
+
+        userInput.addEventListener('keyup', (event) => {
+            if (event.key === 'Enter' && !sendBtn.disabled) {
+                sendMessage();
+            }
+        });
+
+
+        // --- UI Functions ---
+        function validateSetup() {
+            if (jobRoleSelect.value && interviewModeInput.value) {
+                startBtn.disabled = false;
+            } else {
+                startBtn.disabled = true;
+            }
+        }
+
+        function selectInterviewMode(mode) {
+            // This function is now mostly for the button visuals, state is handled in the event listener
+        }
+        
+        startBtn.addEventListener('click', () => {
+            interviewState.role = jobRoleSelect.value;
+            interviewState.domain = domainInput.value || 'general';
+            interviewState.mode = interviewModeInput.value;
+            
+            interviewDetails.textContent = `${interviewState.mode} Interview for ${interviewState.role} (${interviewState.domain})`;
+
+            setupScreen.classList.add('hidden');
+            interviewScreen.classList.add('flex');
+            interviewScreen.classList.remove('hidden');
+
+            startInterview();
+        });
+        
+        function addMessageToChat(sender, message) {
+            const bubble = document.createElement('div');
+            bubble.classList.add('chat-bubble', 'p-4', 'rounded-2xl', 'mb-4', 'w-fit');
+
+            if (sender === 'user') {
+                bubble.classList.add('chat-bubble-user', 'text-white', 'self-end', 'ml-auto');
+            } else {
+                bubble.classList.add('chat-bubble-bot', 'self-start', 'mr-auto');
+                // Use innerHTML to render markdown-like formatting from the model
+                 message = message.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+                 message = message.replace(/\n/g, '<br>');
+            }
+            
+            bubble.innerHTML = message;
+            chatContainer.appendChild(bubble);
+            chatContainer.scrollTop = chatContainer.scrollHeight;
+        }
+
+        function showLoading(isLoading) {
+             // Remove any existing loader first
+            const existingLoader = chatContainer.querySelector('.loader-container');
+            if (existingLoader) {
+                existingLoader.remove();
+            }
+
+            if (isLoading) {
+                const loaderContainer = document.createElement('div');
+                loaderContainer.className = 'loader-container flex justify-start mb-4';
+                const loader = document.createElement('div');
+                loader.className = 'loader';
+                loaderContainer.appendChild(loader);
+                chatContainer.appendChild(loaderContainer);
+                chatContainer.scrollTop = chatContainer.scrollHeight;
+                userInput.disabled = true;
+                sendBtn.disabled = true;
+                actionButtons.classList.add('hidden');
+            } else {
+                 userInput.disabled = !interviewState.isAwaitingAnswer;
+                 sendBtn.disabled = !interviewState.isAwaitingAnswer;
+                 if(interviewState.isAwaitingAnswer) {
+                    actionButtons.classList.remove('hidden');
+                 }
+            }
+        }
+        
+        // --- Core Logic ---
+        async function callGeminiAPI(payload) {
+            try {
+                const response = await fetch(API_URL, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload),
+                });
+                if (!response.ok) {
+                     const errorBody = await response.text();
+                     console.error("API Error Response:", errorBody);
+                     throw new Error(`API request failed with status ${response.status}`);
+                }
+                const result = await response.json();
+                const candidate = result.candidates?.[0];
+                if (candidate && candidate.content?.parts?.[0]?.text) {
+                    return candidate.content.parts[0].text;
+                }
+                throw new Error("Invalid API response structure");
+            } catch (error) {
+                console.error("Error calling Gemini API:", error);
+                return "Sorry, I ran into an error. Please try again.";
+            }
+        }
+
+        function buildPrompt(task) {
+             const conversationHistory = interviewState.conversation.map(turn => `**${turn.role === 'user' ? 'Candidate' : 'Interviewer'}**: ${turn.parts[0].text}`).join('\n\n');
+
+            let systemInstruction = `You are an expert ${interviewState.mode} interviewer for a ${interviewState.role} role, specializing in ${interviewState.domain}. Your persona is professional yet encouraging.`;
+
+            let userQuery = "";
+
+            switch (task) {
+                case 'start':
+                    userQuery = `Start the interview. Greet me and ask the first ${interviewState.mode} question.`;
+                    break;
+                case 'evaluate':
+                    userQuery = `The candidate has answered. Here is the full conversation so far:\n\n${conversationHistory}\n\n**Your task**: First, provide concise feedback on my LAST answer (clarity, correctness, examples). Second, ask the NEXT question. Keep the interview flowing.`;
+                    break;
+                case 'retry':
+                    userQuery = `The candidate wants to retry the last question. Please ask the same question again, perhaps phrasing it slightly differently to help them.`;
+                    break;
+                case 'skip':
+                     userQuery = `The candidate wants to skip the last question. Acknowledge this and ask the NEXT question.`;
+                    break;
+                case 'summary':
+                    systemInstruction = `You are an expert career coach. Based on the following interview transcript, provide a final summary report.`;
+                    userQuery = `The interview is over. Here is the full transcript:\n\n${conversationHistory}\n\n**Your task**: Provide a summary report with these sections, using markdown for formatting:\n\n**Overall Score:** (Give a score out of 10)\n\n**Areas of Strength:** (List 2-3 bullet points)\n\n**Areas to Improve:** (List 2-3 specific, actionable bullet points)\n\n**Suggested Resources:** (Provide 1-2 links or book titles to help them improve)`;
+                    break;
+            }
+
+            const payload = {
+                contents: interviewState.conversation.concat([{ role: "user", parts: [{ text: userQuery }] }]),
+                systemInstruction: { parts: [{ text: systemInstruction }] }
+            };
+            
+            return payload;
+        }
+
+
+        async function startInterview() {
+            addMessageToChat('bot', `Hello! I'll be your interviewer today for the ${interviewState.role} position. We'll be doing a ${interviewState.mode} interview. Let's begin.`);
+            showLoading(true);
+            const payload = buildPrompt('start');
+            const response = await callGeminiAPI(payload);
+            interviewState.conversation.push({ role: "user", parts: [{ text: payload.contents[0].parts[0].text }] });
+            interviewState.conversation.push({ role: "model", parts: [{ text: response }] });
+            showLoading(false);
+            addMessageToChat('bot', response);
+            interviewState.questionCount++;
+            interviewState.isAwaitingAnswer = true;
+            userInput.disabled = false;
+            sendBtn.disabled = false;
+            actionButtons.classList.remove('hidden');
+            userInput.focus();
+        }
+
+        async function sendMessage() {
+            const messageText = userInput.value.trim();
+            if (!messageText) return;
+
+            addMessageToChat('user', messageText);
+            interviewState.conversation.push({ role: "user", parts: [{ text: messageText }] });
+            userInput.value = '';
+            interviewState.isAwaitingAnswer = false;
+            
+            showLoading(true);
+
+            if (interviewState.questionCount >= interviewState.maxQuestions) {
+                await endInterview(false);
+                return;
+            }
+
+            const payload = buildPrompt('evaluate');
+            const response = await callGeminiAPI(payload);
+            
+            // Note: the payload already contained the full history, so we just add the model's new response
+            interviewState.conversation.push({ role: "model", parts: [{ text: response }] });
+
+            showLoading(false);
+            addMessageToChat('bot', response);
+            interviewState.questionCount++;
+            interviewState.isAwaitingAnswer = true;
+            userInput.disabled = false;
+            sendBtn.disabled = false;
+            actionButtons.classList.remove('hidden');
+            userInput.focus();
+        }
+        
+        async function requestRetry() {
+            if (!interviewState.isAwaitingAnswer) return;
+            interviewState.isAwaitingAnswer = false;
+            addMessageToChat('user', "(Decided to retry the question)");
+            showLoading(true);
+            
+            const payload = buildPrompt('retry');
+            const response = await callGeminiAPI(payload);
+
+            interviewState.conversation.push({ role: "user", parts: [{ text: `(System action: Retry question)` }] });
+            interviewState.conversation.push({ role: "model", parts: [{ text: response }] });
+
+            showLoading(false);
+            addMessageToChat('bot', response);
+            interviewState.isAwaitingAnswer = true;
+            userInput.disabled = false;
+            sendBtn.disabled = false;
+            actionButtons.classList.remove('hidden');
+            userInput.focus();
+        }
+
+        async function requestSkip() {
+            if (!interviewState.isAwaitingAnswer) return;
+            interviewState.isAwaitingAnswer = false;
+            addMessageToChat('user', "(Decided to skip the question)");
+            showLoading(true);
+
+            if (interviewState.questionCount >= interviewState.maxQuestions) {
+                await endInterview(false);
+                return;
+            }
+            
+            const payload = buildPrompt('skip');
+            const response = await callGeminiAPI(payload);
+            
+            interviewState.conversation.push({ role: "user", parts: [{ text: `(System action: Skip question)` }] });
+            interviewState.conversation.push({ role: "model", parts: [{ text: response }] });
+            
+            showLoading(false);
+            addMessageToChat('bot', response);
+            interviewState.questionCount++;
+            interviewState.isAwaitingAnswer = true;
+            userInput.disabled = false;
+            sendBtn.disabled = false;
+            actionButtons.classList.remove('hidden');
+            userInput.focus();
+        }
+
+        async function endInterview(manual) {
+            if (manual) addMessageToChat('user', "(Manually ended interview to get the report)");
+            interviewScreen.classList.remove('flex');
+            interviewScreen.classList.add('hidden');
+            summaryScreen.classList.remove('hidden');
+            summaryContent.innerHTML = '<div class="flex justify-center items-center"><div class="loader"></div><p class="ml-4">Generating your report...</p></div>';
+
+            const payload = buildPrompt('summary');
+            const report = await callGeminiAPI(payload);
+            
+            let formattedReport = report
+                .replace(/\*\*(.*?)\*\*/g, '<h3 class="font-bold text-lg mt-4 mb-2 text-slate-800">$1</h3>')
+                .replace(/\* (.*?)(?=\n\*|\n\n|$)/g, '<li>$1</li>')
+                .replace(/(\r\n|\n|\r)/gm, "");
+            
+            // Basic list formatting
+            formattedReport = formattedReport.replace(/<li>/g, '<ul class="list-disc pl-5"><li>').replace(/<\/h3>/g, '</h3><ul>') + '</ul>';
+            // Clean up extra ul tags
+             formattedReport = formattedReport.replace(/<\/ul><ul>/g, '');
+
+
+            summaryContent.innerHTML = formattedReport;
+        }
+
+        function restartInterview() {
+            // Reset state
+            interviewState = {
+                role: '',
+                domain: '',
+                mode: '',
+                conversation: [],
+                questionCount: 0,
+                maxQuestions: 4,
+                isAwaitingAnswer: false
+            };
+            
+            // Clear UI
+            chatContainer.innerHTML = '';
+            userInput.value = '';
+            jobRoleSelect.value = "Software Engineer";
+            domainInput.value = "";
+            interviewModeInput.value = "";
+            modeButtons.forEach(btn => btn.classList.remove('bg-blue-500', 'text-white'));
+            startBtn.disabled = true;
+
+            // Show setup screen
+            summaryScreen.classList.add('hidden');
+            setupScreen.classList.remove('hidden');
+        }
+
+        // Initial call to set button state
+        validateSetup();
+
+    </script>
+</body>
+</html>
